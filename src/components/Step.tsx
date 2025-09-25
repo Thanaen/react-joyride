@@ -105,7 +105,7 @@ export default function JoyrideStep(props: StepProps) {
         id={`react-joyride-step-${index}`}
         open={lifecycle === LIFECYCLE.TOOLTIP}
         placement={step.placement}
-        portalElement={`#${PORTAL_ELEMENT_ID}`}
+        portalElement={step.floaterProps?.portalElement ?? `#${PORTAL_ELEMENT_ID}`}
         target={step.target}
       >
         <Beacon

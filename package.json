@@ -1,14 +1,14 @@
 {
-  "name": "react-joyride",
-  "version": "2.9.3",
+  "name": "@thanaen/react-joyride",
+  "version": "2.11.0",
   "description": "Create guided tours for your apps",
-  "author": "Gil Barbara <gilbarbara@gmail.com>",
+  "author": "thanaen <thanaen.dev@pm.me>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gilbarbara/react-joyride.git"
+    "url": "git+https://github.com/thanaen/react-joyride.git"
   },
   "bugs": {
-    "url": "https://github.com/gilbarbara/react-joyride/issues"
+    "url": "https://github.com/thanaen/react-joyride/issues"
   },
   "homepage": "https://react-joyride.com/",
   "keywords": [
@@ -137,8 +137,7 @@
         "warn",
         {
           "message": "Don't forget to remove calls to  logger before committing.",
-          "selector":
-          "CallExpression[callee.name='logger']"
+          "selector": "CallExpression[callee.name='logger']"
         }
       ]
     },
