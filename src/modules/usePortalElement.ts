@@ -1,53 +1,42 @@
-import { useMount, useSetState, useUnmount } from '@gilbarbara/hooks';
-import is from 'is-lite';
+import { useEffect, useState } from 'react';
 
 import { PORTAL_ELEMENT_ID } from '~/literals';
 
 import { SelectorOrElement } from '~/types';
 
-interface State {
-  element: HTMLElement | null;
-  useExternalPortal: boolean;
-}
-
 export function usePortalElement(portalElement?: SelectorOrElement) {
-  const [{ element, useExternalPortal }, setState] = useSetState<State>({
-    useExternalPortal: false,
-    element: null,
-  });
+  const [element, setElement] = useState<HTMLElement | null>(null);
 
-  useMount(() => {
+  useEffect(() => {
     if (portalElement) {
-      if (is.domElement(portalElement)) {
-        setState({ element: portalElement, useExternalPortal: true });
-      } else {
+      if (typeof portalElement === 'string') {
         const portal = document.querySelector(portalElement);
 
         if (portal) {
-          setState({ element: portal as HTMLElement });
+          setElement(portal as HTMLElement);
         }
+      } else {
+        setElement(portalElement);
       }
-    }
-
-    if (!portalElement) {
+    } else {
       const portal = document.createElement('div');
 
       portal.id = PORTAL_ELEMENT_ID;
 
       document.body.appendChild(portal);
-      setState({ element: portal });
-    }
-  });
-
-  useUnmount(() => {
-    if (!element || useExternalPortal) {
-      return;
+      setElement(portal);
     }
 
-    if (element.parentNode === document.body) {
-      document.body.removeChild(element);
-    }
-  });
+    return () => {
+      if (!portalElement) {
+        const existingPortal = document.getElementById(PORTAL_ELEMENT_ID);
+
+        if (existingPortal && existingPortal.parentNode === document.body) {
+          document.body.removeChild(existingPortal);
+        }
+      }
+    };
+  }, [portalElement]);
 
   return element as HTMLElement;
 }
