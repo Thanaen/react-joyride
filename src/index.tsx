@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useSingleton } from '@gilbarbara/hooks';
 
 import { canUseDOM } from '~/modules/dom';
@@ -62,7 +62,7 @@ export function Joyride(props: Props) {
   const { index, lifecycle, status } = store.current.getState();
   const isRunning = status === STATUS.RUNNING;
   const content: Record<string, ReactNode> = {};
-  const step = useMemo(() => getMergedStep(props, steps[index]), [index, props, steps]);
+  const step = getMergedStep(props, steps[index]);
 
   const handleClickOverlay = () => {
     if (!step?.disableOverlayClose) {

@@ -1,4 +1,4 @@
-import { CSSProperties, useCallback, useEffect, useMemo, useRef } from 'react';
+import { CSSProperties, useEffect, useRef } from 'react';
 import { useIsMounted, useMount, useSetState, useUnmount } from '@gilbarbara/hooks';
 import useTreeChanges from 'tree-changes-hook';
 
@@ -63,84 +63,59 @@ export default function JoyrideOverlay(props: OverlayProps) {
     showSpotlight: true,
   });
 
-  const updateState = useCallback(
-    (state: Partial<State>) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setState(state);
-    },
-    [isMounted, setState],
-  );
-
-  const overlayStyles = useMemo(() => {
-    let baseStyles = styles.overlay;
-
-    if (isLegacy()) {
-      baseStyles = placement === 'center' ? styles.overlayLegacyCenter : styles.overlayLegacy;
+  const updateState = (state: Partial<State>) => {
+    if (!isMounted) {
+      return;
     }
 
-    return {
-      cursor: disableOverlayClose ? 'default' : 'pointer',
-      height: getDocumentHeight(),
-      pointerEvents: mouseOverSpotlight ? 'none' : 'auto',
-      ...baseStyles,
-    } as CSSProperties;
-  }, [
-    disableOverlayClose,
-    mouseOverSpotlight,
-    placement,
-    styles.overlay,
-    styles.overlayLegacy,
-    styles.overlayLegacyCenter,
-  ]);
+    setState(state);
+  };
 
-  const spotlightStyles = useMemo(() => {
-    const element = getElement(target);
-    const elementRect = getClientRect(element);
-    const isFixedTarget = hasPosition(element);
-    const top = getElementPosition(element, spotlightPadding, disableScrollParentFix);
+  let baseStyles = styles.overlay;
 
-    return {
-      height: Math.round((elementRect?.height ?? 0) + spotlightPadding * 2),
-      left: Math.round((elementRect?.left ?? 0) - spotlightPadding),
-      opacity: showSpotlight ? 1 : 0,
-      pointerEvents: spotlightClicks ? 'none' : 'auto',
-      position: isFixedTarget ? 'fixed' : 'absolute',
-      top,
-      transition: 'opacity 0.2s',
-      width: Math.round((elementRect?.width ?? 0) + spotlightPadding * 2),
-      ...(isLegacy() ? styles.spotlightLegacy : styles.spotlight),
-    } satisfies SpotlightStyles;
-  }, [
-    disableScrollParentFix,
-    showSpotlight,
-    spotlightClicks,
-    spotlightPadding,
-    styles.spotlight,
-    styles.spotlightLegacy,
-    target,
-  ]);
+  if (isLegacy()) {
+    baseStyles = placement === 'center' ? styles.overlayLegacyCenter : styles.overlayLegacy;
+  }
 
-  const handleMouseMove = useCallback(
-    (event: MouseEvent) => {
-      const { height, left, position, top, width } = spotlightStyles;
+  const overlayStyles = {
+    cursor: disableOverlayClose ? 'default' : 'pointer',
+    height: getDocumentHeight(),
+    pointerEvents: mouseOverSpotlight ? 'none' : 'auto',
+    ...baseStyles,
+  } as CSSProperties;
 
-      const offsetY = position === 'fixed' ? event.clientY : event.pageY;
-      const offsetX = position === 'fixed' ? event.clientX : event.pageX;
-      const inSpotlightHeight = offsetY >= top && offsetY <= top + height;
-      const inSpotlightWidth = offsetX >= left && offsetX <= left + width;
-      const inSpotlight = inSpotlightWidth && inSpotlightHeight;
+  const element = getElement(target);
+  const elementRect = getClientRect(element);
+  const isFixedTarget = hasPosition(element);
+  const top = getElementPosition(element, spotlightPadding, disableScrollParentFix);
 
-      if (inSpotlight !== mouseOverSpotlight) {
-        updateState({ mouseOverSpotlight: inSpotlight });
-      }
-    },
-    [spotlightStyles, mouseOverSpotlight, updateState],
-  );
+  const spotlightStyles = {
+    height: Math.round((elementRect?.height ?? 0) + spotlightPadding * 2),
+    left: Math.round((elementRect?.left ?? 0) - spotlightPadding),
+    opacity: showSpotlight ? 1 : 0,
+    pointerEvents: spotlightClicks ? 'none' : 'auto',
+    position: isFixedTarget ? 'fixed' : 'absolute',
+    top,
+    transition: 'opacity 0.2s',
+    width: Math.round((elementRect?.width ?? 0) + spotlightPadding * 2),
+    ...(isLegacy() ? styles.spotlightLegacy : styles.spotlight),
+  } satisfies SpotlightStyles;
 
-  const handleResize = useCallback(() => {
+  const handleMouseMove = (event: MouseEvent) => {
+    const { height, left, position, top, width } = spotlightStyles;
+
+    const offsetY = position === 'fixed' ? event.clientY : event.pageY;
+    const offsetX = position === 'fixed' ? event.clientX : event.pageX;
+    const inSpotlightHeight = offsetY >= top && offsetY <= top + height;
+    const inSpotlightWidth = offsetX >= left && offsetX <= left + width;
+    const inSpotlight = inSpotlightWidth && inSpotlightHeight;
+
+    if (inSpotlight !== mouseOverSpotlight) {
+      updateState({ mouseOverSpotlight: inSpotlight });
+    }
+  };
+
+  const handleResize = () => {
     clearTimeout(resizeTimeoutRef.current);
 
     resizeTimeoutRef.current = window.setTimeout(() => {
@@ -150,9 +125,9 @@ export default function JoyrideOverlay(props: OverlayProps) {
 
       setState({ resizedAt: Date.now() });
     }, 100);
-  }, [isMounted, setState]);
+  };
 
-  const handleScroll = useCallback(() => {
+  const handleScroll = () => {
     const element = getElement(target);
 
     if (scrollParentRef.current !== document) {
@@ -168,7 +143,7 @@ export default function JoyrideOverlay(props: OverlayProps) {
     } else if (hasPosition(element, 'sticky')) {
       updateState({});
     }
-  }, [isScrolling, target, updateState]);
+  };
 
   useMount(() => {
     const element = getElement(target);
