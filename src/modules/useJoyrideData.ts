@@ -1,4 +1,4 @@
-import { MutableRefObject, useRef } from 'react';
+import { MutableRefObject, useCallback, useMemo, useRef } from 'react';
 import isEqual from '@gilbarbara/deep-equal';
 import {
   useDeepCompareEffect,
@@ -56,8 +56,9 @@ export default function useJoyrideData(
   const { changed: changedProps } = useTreeChanges(props);
   const { changed: changedState, changedFrom: changedStateFrom } = useTreeChanges(state);
 
-  const step = getMergedStep(props, steps[index]);
-  const previousStep = getMergedStep(props, steps[index - 1]);
+  const step = useMemo(() => getMergedStep(props, steps[index]), [index, props, steps]);
+
+  const previousStep = useMemo(() => getMergedStep(props, steps[index - 1]), [index, props, steps]);
 
   useSingleton(() => {
     store.current.addListener(newState => {
@@ -65,72 +66,85 @@ export default function useJoyrideData(
     });
   });
 
-  const scrollToStep = (lastState: State) => {
-    if (!step) {
-      return;
-    }
+  const scrollToStep = useCallback(
+    (lastState: State) => {
+      if (!step) {
+        return;
+      }
 
-    const target = getElement(step.target);
-    const shouldScrollToStep = shouldScroll({
-      isFirstStep: index === 0,
-      lifecycle,
-      previousLifecycle: lastState.lifecycle,
-      scrollToFirstStep,
-      step,
-      target,
-    });
-    const beaconPopper = store.current.getPopper('beacon');
-    const tooltipPopper = store.current.getPopper('tooltip');
-
-    if (status === STATUS.RUNNING && shouldScrollToStep) {
-      const hasCustomScroll = hasCustomScrollParent(target, disableScrollParentFix);
-      const scrollParent = getScrollParent(target, disableScrollParentFix);
-      let scrollY = Math.floor(getScrollTo(target, scrollOffset, disableScrollParentFix)) || 0;
-
-      log({
-        title: 'scrollToStep',
-        data: [
-          { key: 'index', value: index },
-          { key: 'lifecycle', value: lifecycle },
-          { key: 'status', value: status },
-        ],
-        debug,
+      const target = getElement(step.target);
+      const shouldScrollToStep = shouldScroll({
+        isFirstStep: index === 0,
+        lifecycle,
+        previousLifecycle: lastState.lifecycle,
+        scrollToFirstStep,
+        step,
+        target,
       });
+      const beaconPopper = store.current.getPopper('beacon');
+      const tooltipPopper = store.current.getPopper('tooltip');
 
-      if (lifecycle === LIFECYCLE.BEACON && beaconPopper) {
-        const { modifiersData, placement } = beaconPopper.state ?? {};
-        const { offset } = modifiersData ?? {};
-        const y = offset?.top?.y ?? 0;
+      if (status === STATUS.RUNNING && shouldScrollToStep) {
+        const hasCustomScroll = hasCustomScrollParent(target, disableScrollParentFix);
+        const scrollParent = getScrollParent(target, disableScrollParentFix);
+        let scrollY = Math.floor(getScrollTo(target, scrollOffset, disableScrollParentFix)) || 0;
 
-        if (!['bottom'].includes(placement) && !hasCustomScroll) {
-          scrollY = Math.floor(y - scrollOffset);
+        log({
+          title: 'scrollToStep',
+          data: [
+            { key: 'index', value: index },
+            { key: 'lifecycle', value: lifecycle },
+            { key: 'status', value: status },
+          ],
+          debug,
+        });
+
+        if (lifecycle === LIFECYCLE.BEACON && beaconPopper) {
+          const { modifiersData, placement } = beaconPopper.state ?? {};
+          const { offset } = modifiersData ?? {};
+          const y = offset?.top?.y ?? 0;
+
+          if (!['bottom'].includes(placement) && !hasCustomScroll) {
+            scrollY = Math.floor(y - scrollOffset);
+          }
+        } else if (lifecycle === LIFECYCLE.TOOLTIP && tooltipPopper) {
+          const { modifiersData, placement } = tooltipPopper.state ?? {};
+          const { offset } = modifiersData ?? {};
+          const y = offset?.top?.y ?? 0;
+          const flipped = !!placement && placement !== step.placement;
+
+          if (['top', 'right', 'left'].includes(placement) && !flipped && !hasCustomScroll) {
+            scrollY = Math.floor(y - scrollOffset);
+          } else {
+            scrollY -= step.spotlightPadding;
+          }
         }
-      } else if (lifecycle === LIFECYCLE.TOOLTIP && tooltipPopper) {
-        const { modifiersData, placement } = tooltipPopper.state ?? {};
-        const { offset } = modifiersData ?? {};
-        const y = offset?.top?.y ?? 0;
-        const flipped = !!placement && placement !== step.placement;
 
-        if (['top', 'right', 'left'].includes(placement) && !flipped && !hasCustomScroll) {
-          scrollY = Math.floor(y - scrollOffset);
-        } else {
-          scrollY -= step.spotlightPadding;
+        scrollY = scrollY >= 0 ? scrollY : 0;
+
+        if (status === STATUS.RUNNING) {
+          scrollTo(scrollY, { element: scrollParent as Element, duration: scrollDuration }).then(
+            () => {
+              setTimeout(() => {
+                store.current.getPopper('tooltip')?.update();
+              }, 10);
+            },
+          );
         }
       }
-
-      scrollY = scrollY >= 0 ? scrollY : 0;
-
-      if (status === STATUS.RUNNING) {
-        scrollTo(scrollY, { element: scrollParent as Element, duration: scrollDuration }).then(
-          () => {
-            setTimeout(() => {
-              store.current.getPopper('tooltip')?.update();
-            }, 10);
-          },
-        );
-      }
-    }
-  };
+    },
+    [
+      debug,
+      disableScrollParentFix,
+      index,
+      lifecycle,
+      scrollDuration,
+      scrollOffset,
+      scrollToFirstStep,
+      status,
+      step,
+    ],
+  );
 
   useMount(() => {
     if (run && size && validateSteps(steps, debug)) {
