@@ -28,7 +28,7 @@ const config = defineConfig({
       testIgnore: ['scroll.spec.tsx'],
     },
   ],
-  reporter: 'html',
+  reporter: 'line',
   retries: process.env.CI ? 2 : 0,
   snapshotDir: './e2e/__snapshots__',
   snapshotPathTemplate: '{testDir}/__snapshots__/{testFilePath}/{arg}-{projectName}{ext}',
