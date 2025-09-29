@@ -10,6 +10,7 @@ import {
   getScrollParent,
   hasCustomScrollParent,
   hasPosition,
+  scrollDocument,
 } from '~/modules/dom';
 import { getBrowser, isLegacy, log } from '~/modules/helpers';
 
@@ -44,6 +45,7 @@ export default function JoyrideOverlay(props: OverlayProps) {
     lifecycle,
     onClickOverlay,
     placement,
+    portalElement,
     spotlightClicks,
     spotlightPadding = 0,
     styles,
@@ -101,20 +103,31 @@ export default function JoyrideOverlay(props: OverlayProps) {
     const elementRect = getClientRect(element);
     const isFixedTarget = hasPosition(element);
     const top = getElementPosition(element, spotlightPadding, disableScrollParentFix);
+    const shouldOffsetPortal =
+      portalElement && portalElement.parentElement && portalElement.parentElement !== document.body;
+    const portalRect = shouldOffsetPortal ? portalElement?.getBoundingClientRect() : null;
+    const scrollRoot = portalRect ? scrollDocument() : null;
+    const rootRect =
+      portalRect && scrollRoot instanceof Element && 'getBoundingClientRect' in scrollRoot
+        ? (scrollRoot as Element).getBoundingClientRect()
+        : null;
+    const portalOffsetTop = portalRect && rootRect ? portalRect.top - rootRect.top : 0;
+    const portalOffsetLeft = portalRect && rootRect ? portalRect.left - rootRect.left : 0;
 
     return {
       height: Math.round((elementRect?.height ?? 0) + spotlightPadding * 2),
-      left: Math.round((elementRect?.left ?? 0) - spotlightPadding),
+      left: Math.round((elementRect?.left ?? 0) - spotlightPadding - portalOffsetLeft),
       opacity: showSpotlight ? 1 : 0,
       pointerEvents: spotlightClicks ? 'none' : 'auto',
       position: isFixedTarget ? 'fixed' : 'absolute',
-      top,
+      top: Math.round(top - portalOffsetTop),
       transition: 'opacity 0.2s',
       width: Math.round((elementRect?.width ?? 0) + spotlightPadding * 2),
       ...(isLegacy() ? styles.spotlightLegacy : styles.spotlight),
     } satisfies SpotlightStyles;
   }, [
     disableScrollParentFix,
+    portalElement,
     showSpotlight,
     spotlightClicks,
     spotlightPadding,

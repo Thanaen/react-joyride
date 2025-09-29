@@ -148,6 +148,7 @@ export type OverlayProps = Simplify<
     debug: boolean;
     lifecycle: Lifecycle;
     onClickOverlay: () => void;
+    portalElement?: HTMLElement | null;
   }
 >;
 
