@@ -1,4 +1,5 @@
 import { CSSProperties, useCallback, useEffect, useMemo, useRef } from 'react';
+import { autoUpdate, useFloating } from '@floating-ui/react-dom';
 import { useIsMounted, useMount, useSetState, useUnmount } from '@gilbarbara/hooks';
 import useTreeChanges from 'tree-changes-hook';
 
@@ -6,7 +7,6 @@ import {
   getClientRect,
   getDocumentHeight,
   getElement,
-  getElementPosition,
   getScrollParent,
   hasCustomScrollParent,
   hasPosition,
@@ -98,11 +98,27 @@ export default function JoyrideOverlay(props: OverlayProps) {
     styles.overlayLegacyCenter,
   ]);
 
+  // Use floating-ui for spotlight positioning
+  const element = useMemo(() => getElement(target), [target]);
+  const isFixedTarget = hasPosition(element);
+
+  const { update, x, y } = useFloating({
+    elements: {
+      reference: element,
+    },
+    strategy: isFixedTarget ? 'fixed' : 'absolute',
+    whileElementsMounted: autoUpdate,
+  });
+
+  // Force update when element changes
+  useEffect(() => {
+    if (element) {
+      update();
+    }
+  }, [element, update]);
+
   const spotlightStyles = useMemo(() => {
-    const element = getElement(target);
     const elementRect = getClientRect(element);
-    const isFixedTarget = hasPosition(element);
-    const top = getElementPosition(element, spotlightPadding, disableScrollParentFix);
     const shouldOffsetPortal =
       portalElement && portalElement.parentElement && portalElement.parentElement !== document.body;
     const portalRect = shouldOffsetPortal ? portalElement?.getBoundingClientRect() : null;
@@ -114,26 +130,52 @@ export default function JoyrideOverlay(props: OverlayProps) {
     const portalOffsetTop = portalRect && rootRect ? portalRect.top - rootRect.top : 0;
     const portalOffsetLeft = portalRect && rootRect ? portalRect.left - rootRect.left : 0;
 
+    // floating-ui provides x and y coordinates in viewport space
+    // For 'absolute' strategy, we need to add scroll offsets to convert to document space
+    const baseLeft = (x ?? 0) === 0 && elementRect ? elementRect.left : x ?? 0;
+    let baseTop = (y ?? 0) === 0 && elementRect ? elementRect.top : y ?? 0;
+
+    // Add scroll offset for absolute positioned elements
+    if (!isFixedTarget) {
+      const parent = getScrollParent(element, disableScrollParentFix);
+      const hasScrollParent = hasCustomScrollParent(element, disableScrollParentFix);
+
+      if (parent instanceof HTMLElement) {
+        const parentTop = parent.scrollTop;
+
+        if (!hasScrollParent) {
+          baseTop += parentTop;
+        }
+
+        if (!parent.isSameNode(scrollDocument())) {
+          baseTop += scrollDocument().scrollTop;
+        }
+      }
+    }
+
     return {
       height: Math.round((elementRect?.height ?? 0) + spotlightPadding * 2),
-      left: Math.round((elementRect?.left ?? 0) - spotlightPadding - portalOffsetLeft),
+      left: Math.round(baseLeft - spotlightPadding - portalOffsetLeft),
       opacity: showSpotlight ? 1 : 0,
       pointerEvents: spotlightClicks ? 'none' : 'auto',
       position: isFixedTarget ? 'fixed' : 'absolute',
-      top: Math.round(top - portalOffsetTop),
+      top: Math.round(baseTop - spotlightPadding - portalOffsetTop),
       transition: 'opacity 0.2s',
       width: Math.round((elementRect?.width ?? 0) + spotlightPadding * 2),
       ...(isLegacy() ? styles.spotlightLegacy : styles.spotlight),
     } satisfies SpotlightStyles;
   }, [
     disableScrollParentFix,
+    element,
+    isFixedTarget,
     portalElement,
     showSpotlight,
     spotlightClicks,
     spotlightPadding,
     styles.spotlight,
     styles.spotlightLegacy,
-    target,
+    x,
+    y,
   ]);
 
   const handleMouseMove = useCallback(
@@ -166,7 +208,7 @@ export default function JoyrideOverlay(props: OverlayProps) {
   }, [isMounted, setState]);
 
   const handleScroll = useCallback(() => {
-    const element = getElement(target);
+    const targetElement = getElement(target);
 
     if (scrollParentRef.current !== document) {
       if (!isScrolling) {
@@ -178,22 +220,22 @@ export default function JoyrideOverlay(props: OverlayProps) {
       scrollTimeoutRef.current = window.setTimeout(() => {
         updateState({ isScrolling: false, showSpotlight: true });
       }, 50);
-    } else if (hasPosition(element, 'sticky')) {
+    } else if (hasPosition(targetElement, 'sticky')) {
       updateState({});
     }
   }, [isScrolling, target, updateState]);
 
   useMount(() => {
-    const element = getElement(target);
+    const targetElement = getElement(target);
 
     scrollParentRef.current = getScrollParent(
-      element ?? document.body,
+      targetElement ?? document.body,
       disableScrollParentFix,
       true,
     );
 
     if (process.env.NODE_ENV !== 'production') {
-      if (!disableScrolling && hasCustomScrollParent(element, true)) {
+      if (!disableScrolling && hasCustomScrollParent(targetElement, true)) {
         log({
           title: 'step has a custom scroll parent and can cause trouble with scrolling',
           data: [{ key: 'parent', value: scrollParentRef }],
@@ -239,10 +281,10 @@ export default function JoyrideOverlay(props: OverlayProps) {
 
   useEffect(() => {
     if (changed('target') || changed('disableScrollParentFix')) {
-      const element = getElement(target);
+      const targetElement = getElement(target);
 
       scrollParentRef.current = getScrollParent(
-        element ?? document.body,
+        targetElement ?? document.body,
         disableScrollParentFix,
         true,
       );
